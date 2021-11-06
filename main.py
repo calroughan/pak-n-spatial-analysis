@@ -144,23 +144,6 @@ def join_way_data(data_subset, way_locations):
     return data_subset
 
 
-def isochrone_params(mode, travel_time):
-    """
-    Create a dictionary of the isochrone parameters, including:
-    - 'profile':    The transportation method.
-                    Some options are: 'driving-chair', 'foot-walking', and 'cycling-regular'
-    - 'range':      The maximum travel time from each node to the isochrone boundary
-    - 'attributes': Return additional geographic information about the isochrones
-    """
-
-    params = {
-        'profile': mode
-        , 'range': [travel_time * 60]       # Convert the travel_time to seconds
-        , 'attributes': ['total_pop']
-    }
-    return params
-
-
 def generate_ors_isochrones(supermarket, params, ors, throttle_requests):
     """
     The standard ORS API facilitates 20 isochrone requests per minute, hence the program sleeps for 3 seconds per
@@ -185,7 +168,7 @@ def map_colours(supermarkets, colours):
     return dict(zip([supermarket.lower() for supermarket in supermarkets], colours))
 
 
-def add_location_to_folium(map, supermarket, colour_dict):
+def add_locations_to_folium(map, supermarket, colour_dict):
     """
     Add the isochrones and a marker for each location to the map
     """
@@ -210,8 +193,7 @@ def add_location_to_folium(map, supermarket, colour_dict):
 
 if __name__ == '__main__':
 
-    # Set this to true if not hosting your own OpenRouteService instance
-    throttle_requests = True
+    """ Data extraction """
 
     # Define a bounding box to extract all data from within. The order is: bottom lat, left lon, top lat, right lon
     bbox = [-37.1109295, 174.3876826, -36.670165, 175.082077]
@@ -219,15 +201,6 @@ if __name__ == '__main__':
     # Specify the points of interest
     supermarkets = ['Countdown', 'New World', 'Pak\'nSave']
     colours = ['green', 'red', 'yellow']
-
-    # Transportation mode
-    mode = 'driving-car'
-    # mode = 'foot-walking'
-    # mode = 'cycling-regular'
-    # mode = 'wheelchair'
-
-    # Travel time to the station (minutes)
-    travel_time = 3
 
     # Get data from OpenStreetMap
     data = query_overpass_for_supermarket_data(bbox)
@@ -241,16 +214,32 @@ if __name__ == '__main__':
     # Join this these way locations to the supermarkets of interest
     data_subset = join_way_data(data_subset, way_locations)
 
+    """ Generate the isochrone parameters """
+
+    """
+     Create a dictionary of the isochrone parameters, including:
+     - 'profile':    The transportation method.
+                     Some options are: 'driving-chair', 'foot-walking', and 'cycling-regular'
+     - 'range':      The maximum travel time from each node to the isochrone boundary
+     - 'attributes': Return additional geographic information about the isochrones
+     """
+
     # Generate the API parameters
-    params = isochrone_params(mode, travel_time)
+    params = {
+        'profile': 'driving-car'
+        # 'profile': 'foot-walking'
+        # 'profile': 'cycling-regular'
+        , 'range': [180]           # Three minutes in seconds
+        , 'attributes': ['total_pop']
+    }
 
-    # Set up folium map.
-    map_type = 'Stamen Toner'                                           # Monochromatic map
-    # map_type = 'openstreetmap'                                        # Normal map
+    # Set this to true if not hosting your own Openrouteservice instance
+    throttle_requests = True
 
+    """ Set up folium map """
     m = folium.Map(
-        tiles=map_type
-        # , location=(data_subset[0]['location'])                       # Centre the map at the first supermarket
+        tiles='Stamen Toner'                                            # Monochromatic map
+        # tiles='openstreetmap'                                         # Normal map
         , location=((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)   # Centre the map using the bounding box coords
         , zoom_start=11
     )
@@ -258,10 +247,7 @@ if __name__ == '__main__':
     colour_dict = map_colours(supermarkets, colours)
 
     # Loop over the stations and query the API for the isochrone data, then add each station to the map
-    for idx, key in enumerate(data_subset.keys()):
-
-        if idx % 20 == 0:
-            print(f"Currently processing supermarket {idx} of {len(list(data_subset.keys()))}.")
+    for key in data_subset.keys():
 
         # Return an isochrone for the supermarket
         supermarket = generate_ors_isochrones(
@@ -272,8 +258,7 @@ if __name__ == '__main__':
         )
 
         # Add this point to the folium map
-        add_location_to_folium(m, supermarket, colour_dict)
+        add_locations_to_folium(m, supermarket, colour_dict)
 
-    map_name = 'Supermarkets.html'
-    m.save(map_name)
-    webbrowser.open(path.realpath(map_name), new=2)
+    m.save('Supermarkets.html')
+    webbrowser.open(path.realpath('Supermarkets.html'), new=2)
