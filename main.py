@@ -1,4 +1,3 @@
-import json
 import requests
 import xml.etree.ElementTree as ET
 import folium
@@ -13,11 +12,11 @@ from secrets import api_key
 
 def query_overpass_for_supermarket_data(bbox):
     """
-    Query the Overpass API to return all supermarket data within the bounding box specified.
+    Query the Overpass API to return all supermarket data within the specified bounding box.
     Return both nodes and ways.
     - Nodes are single points.
     - Ways are collections of nodes which may represent the exterior of a building, for example.
-    Return this output as JSON as opposed to XML.
+    Return this output as JSON as opposed to the default XML.
 
     This is a good introduction to the Overpass API format.
     https://gis.stackexchange.com/questions/187447/understanding-overpassturbo-query
@@ -88,7 +87,7 @@ def extract_supermarkets_of_interest(supermarkets, data):
     return subset
 
 
-def query_overpass_for_node_location(supermarkets):
+def query_overpass_for_node_location(data_subset):
     """
     The input subset contains the supermarkets of interest. Extract each point that is a 'way' such that we can query
     the Overpass API to return the coordinates of the first 'node' in the 'way'.
@@ -99,7 +98,7 @@ def query_overpass_for_node_location(supermarkets):
     """
 
     # Extract the 'ways' from all supermarkets
-    way_nodes = gather_way_nodes(supermarkets)
+    way_nodes = gather_way_nodes(data_subset)
     way_locations = []
 
     # Query the API in batches of 100 nodes as to not overload the API.
@@ -118,19 +117,15 @@ def query_overpass_for_node_location(supermarkets):
     return way_locations
 
 
-def gather_way_nodes(subset):
+def gather_way_nodes(data_subset):
     """
-    Create a list to store the first nodes of each 'way polygon' such that we can query the overpass API to return the
+    Return a list of the first nodes of each 'way polygon' such that we can query the overpass API to return the
     location.
     """
-    way_nodes = []
-    for key in subset.keys():
-        if subset[key]['type'] == 'way':
-            way_nodes.append(subset[key]['location'])
-    return way_nodes
+    return [data_subset[key]['location'] for key in data_subset.keys() if data_subset[key]['type'] == 'way']
 
 
-def join_way_data(subset, way_locations):
+def join_way_data(data_subset, way_locations):
     """
     Join the Overpass API response to the location data.
     Note that the API responses are not always returned in the same order as the input request.
@@ -140,13 +135,13 @@ def join_way_data(subset, way_locations):
     way_keys = [x['id'] for x in way_locations]
 
     # Assign the API response coordinates to the data
-    for key in subset.keys():
-        if subset[key]['type'] == 'way':
+    for key in data_subset.keys():
+        if data_subset[key]['type'] == 'way':
 
-            idx = way_keys.index(str(subset[key]['location']))
-            subset[key]['location'] = [way_locations[idx]['lat'], way_locations[idx]['lon']]
+            idx = way_keys.index(str(data_subset[key]['location']))
+            data_subset[key]['location'] = [way_locations[idx]['lat'], way_locations[idx]['lon']]
 
-    return subset
+    return data_subset
 
 
 def isochrone_params(mode, travel_time):
@@ -226,13 +221,13 @@ if __name__ == '__main__':
     colours = ['green', 'red', 'yellow']
 
     # Transportation mode
-    # mode = 'driving-car'
-    mode = 'foot-walking'
+    mode = 'driving-car'
+    # mode = 'foot-walking'
     # mode = 'cycling-regular'
     # mode = 'wheelchair'
 
     # Travel time to the station (minutes)
-    travel_time = 15
+    travel_time = 3
 
     # Get data from OpenStreetMap
     data = query_overpass_for_supermarket_data(bbox)
@@ -243,7 +238,7 @@ if __name__ == '__main__':
     # Extract locations of the first node in each way
     way_locations = query_overpass_for_node_location(data_subset)
 
-    # Join this these way locations to the supremarkets of interest
+    # Join this these way locations to the supermarkets of interest
     data_subset = join_way_data(data_subset, way_locations)
 
     # Generate the API parameters
