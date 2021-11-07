@@ -49,7 +49,7 @@ def extract_supermarkets_of_interest(supermarkets, data):
     """
 
     # Create a dict to store all supermarkets of interest extracted from OSM
-    subset = {}
+    data_subset = {}
 
     for element in data['elements']:
 
@@ -62,9 +62,9 @@ def extract_supermarkets_of_interest(supermarkets, data):
                 if supermarket.lower() in element['tags']['name'].lower():
 
                     # If the element is a way, ie comprised of multiple nodes, then take the first node as the location
-                    if 'nodes' in element:
+                    if element['type'] == 'way':
 
-                        subset[element['id']] = {
+                        data_subset[element['id']] = {
                             'name': supermarket.lower()
                             , 'display name': element['tags']['name']
                             , 'type': 'way'
@@ -74,7 +74,7 @@ def extract_supermarkets_of_interest(supermarkets, data):
                     # If the element is a single node, store the location of the node
                     elif element['type'] == 'node':
 
-                        subset[element['id']] = {
+                        data_subset[element['id']] = {
                             'name': supermarket.lower()
                             , 'display name': element['tags']['name']
                             , 'type': 'node'
@@ -84,7 +84,7 @@ def extract_supermarkets_of_interest(supermarkets, data):
                     else:
                         print(f"Location {element['tags']['name']} does not appear to be readable")
 
-    return subset
+    return data_subset
 
 
 def query_overpass_for_node_location(data_subset):
@@ -101,7 +101,7 @@ def query_overpass_for_node_location(data_subset):
     way_nodes = gather_way_nodes(data_subset)
     way_locations = []
 
-    # Query the API in batches of 100 nodes as to not overload the API.
+    # Query the API in batches of 100 nodes for speed.
     for i in range(0, len(way_nodes), 100):
 
         # Query the batch of nodes
@@ -213,16 +213,6 @@ if __name__ == '__main__':
 
     # Join this these way locations to the supermarkets of interest
     data_subset = join_way_data(data_subset, way_locations)
-
-    """ Generate the isochrone parameters """
-
-    """
-     Create a dictionary of the isochrone parameters, including:
-     - 'profile':    The transportation method.
-                     Some options are: 'driving-chair', 'foot-walking', and 'cycling-regular'
-     - 'range':      The maximum travel time from each node to the isochrone boundary
-     - 'attributes': Return additional geographic information about the isochrones
-     """
 
     # Generate the API parameters
     params = {
